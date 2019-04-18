@@ -242,7 +242,8 @@
 	"script_size_f=0x40000\0"	\
 	"bootenv=uEnv.txt\0" \
 	"loadbootenv=load mmc 0 ${loadbootenv_addr} ${bootenv}\0" \
-	"importbootenv=echo Importing environment from SD ...; " \
+	"tftpbootenv=dhcp && tftpboot ${loadbootenv_addr} ${bootfile}\0" \
+	"importbootenv=echo Importing environment from ${loadbootenv_addr} ...; " \
 		"env import -t ${loadbootenv_addr} $filesize\0" \
 	"sd_uEnvtxt_existence_test=test -e mmc 0 /uEnv.txt\0" \
 	"preboot=if test $modeboot = sdboot && env run sd_uEnvtxt_existence_test; " \
@@ -270,7 +271,7 @@
 		"sf read ${ramdisk_load_address} 0x620000 ${ramdisk_size} && " \
 		"bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}\0" \
 	"uenvboot=" \
-		"if run loadbootenv; then " \
+		"if run tftpbootenv; then " \
 			"echo Loaded environment from ${bootenv}; " \
 			"run importbootenv; " \
 		"fi; " \
@@ -283,8 +284,8 @@
 			"echo Copying Linux from SD to RAM... && " \
 			"load mmc 0 ${kernel_load_address} ${kernel_image} && " \
 			"load mmc 0 ${devicetree_load_address} ${devicetree_image} && " \
-			"load mmc 0 ${ramdisk_load_address} ${ramdisk_image} && " \
-			"bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}; " \
+	                "setenv bootargs $bootargs root=/dev/mmcblk0p2 rw rootwait && " \
+			"bootm ${kernel_load_address} - ${devicetree_load_address}; " \
 		"fi\0" \
 	"usbboot=run xilinxcmd && if usb start; then " \
 			"run uenvboot; " \
