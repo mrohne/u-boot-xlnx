@@ -24,15 +24,24 @@
 #endif
 #define CONFIG_PREBOOT "run bootcmd_mmc1"
 
+#undef BOOTENV_DEV_NAME_DHCP
+#define BOOTENV_DEV_NAME_DHCP(devtypeu, devtypel, instance) \
+  #devtypel " "  
 #undef BOOTENV_DEV_DHCP
 #define BOOTENV_DEV_DHCP(devtypeu, devtypel, instance)	\
 	"bootcmd_dhcp="					\
-	"if dhcp ${uenvaddr}; then "	\
-	"env import -t ${uenvaddr} ${filesize}; "	\
+	"env set autoload 1; " \
+	"if dhcp ${uenvaddr}; then " \
+	"echo Importing environment at $fileaddr:$filesize; " \
+	"env import -t $fileaddr $filesize; "		\
 	"fi; "						\
-	"env exists modeboot && run $modeboot; "                               \
 	"\0"
+#undef BOOT_TARGET_DEVICES_DHCP
+#define BOOT_TARGET_DEVICES_DHCP(func) func(DHCP, dhcp, 0)
 
+#undef BOOTENV_DEV_NAME_MMC
+#define BOOTENV_DEV_NAME_MMC(devtypeu, devtypel, instance) \
+  #devtypel #instance " "  
 #undef BOOTENV_DEV_MMC
 #define BOOTENV_DEV_MMC(devtypeu, devtypel, instance)	\
 	"bootcmd_mmc" #instance "="			\
@@ -40,39 +49,51 @@
 	"mmc rescan; mmc dev ${devnum}; "		\
 	"mmc info; mmc part; "				\
 	"if load mmc ${devnum} ${uenvaddr} ${uenvfile}; then "	\
-	"env import -t {uenvaddr} ${filesize}; "		\
+	"echo Importing environment at $fileaddr:$filesize; " \
+	"env import -t $fileaddr $filesize; "		\
 	"fi; "							\
-        "env exists modeboot && run $modeboot; "		\
 	"\0"
+#undef BOOT_TARGET_DEVICES_MMC
+#define BOOT_TARGET_DEVICES_MMC(func) func(MMC, mmc, 1)
 
+#undef BOOTENV_DEV_NAME_QSPI
+#define BOOTENV_DEV_NAME_QSPI(devtypeu, devtypel, instance) \
+  #devtypel #instance " "  
 #undef BOOTENV_DEV_QSPI
 #define BOOTENV_DEV_QSPI(devtypeu, devtypel, instance) \
 	"bootcmd_" #devtypel #instance "="             \
-	"sf probe " #instance " 0 0; " \
-	"if sf read $uenvaddr $script_offset_f $script_size_f; then "	\
-	"env import -t ${uenvaddr} $script_size_f; " \
-	"fi; "				\
-        "env exists modeboot && run $modeboot; "		\
+	"sf probe " #instance " 0 0; "					\
+	"if sf read $uenvaddr $uenvoffs $uenvsize; then "	\
+	"echo Importing environment at $fileaddr:$filesize; " \
+	"env import -t $fileaddr $filesize; "		\
+	"fi; "								\
 	"\0"
+#undef BOOT_TARGET_DEVICES_QSPI
+#define BOOT_TARGET_DEVICES_QSPI(func) func(QSPI, qspi, 0)
+
+#undef BOOTENV_DEV
+#define BOOTENV_DEV(devtypeu, devtypel, instance) \
+	BOOTENV_DEV_##devtypeu(devtypeu, devtypel, instance)
+
+#undef BOOTENV_DEV_NAME
+#define BOOTENV_DEV_NAME(devtypeu, devtypel, instance)			\
+	BOOTENV_DEV_NAME_##devtypeu(devtypeu, devtypel, instance)
 
 #undef BOOT_TARGET_DEVICES
-#define BOOT_TARGET_DEVICES(func)		\
-  func(DHCP, dhcp, na)				\
-  func(MMC, mmc, 1)				\
-  func(QSPI, qspi, 0)				\
+#define BOOT_TARGET_DEVICES(func)      \
+  BOOT_TARGET_DEVICES_DHCP(func)       \
+    BOOT_TARGET_DEVICES_QSPI(func)     \
+    BOOT_TARGET_DEVICES_MMC(func)
 
 #undef BOOTENV
-#define BOOTENV								\
-  BOOTENV_SHARED_MMC							\
-  BOOTENV_BOOT_TARGETS							\
+#define BOOTENV		   \
   BOOT_TARGET_DEVICES(BOOTENV_DEV)					\
+    "boot_targets=dhcp qspi mmc1\0"					\
     "distro_bootcmd="							\
     "for target in ${boot_targets}; do "				\
     "run bootcmd_${target}; "						\
-    "done\0"								\
-
-#undef CONFIG_BOOTCOMMAND
-#define CONFIG_BOOTCOMMAND "run distro_bootcmd"
+    "env exists modeboot && run $modeboot; "				\
+    "done\0"  
 
 #undef  ENV_MEM_LAYOUT_SETTINGS
 #define ENV_MEM_LAYOUT_SETTINGS \
